@@ -1,135 +1,216 @@
 from pathlib import Path
+import re
+from os import PathLike
+import numpy as np
 import pandas as pd
 from config import MART_DATA_DIR, STAGING_DATA_DIR
 
-# Define input and output file paths
-INPUT_FILE = STAGING_DATA_DIR / "third_merge.csv"
-OUTPUT_FILE = MART_DATA_DIR / "cleaned_data.csv"
+# Define the input and output file paths
+INPUT_FILE: Path = STAGING_DATA_DIR / "third_merge.csv"
+OUTPUT_FILE: Path = MART_DATA_DIR / "cleaned_data.csv"
 
-# Define the columns to retain in the cleaned dataset
-RETAINED_COLUMNS = (
-	"date",
-	"market_me",
-	"market_mtb",
-	"nout_volume",
-	"oil",
-	"gold",
-	"exchange",
-	"rsi",
-	"pli",
-	"i",
-	"return_wholesale",
-	"return_groce",
-	"return_retail",
-	"return_petro",
-	"return_service",
-	"return_hospitality",
-	"return_pharma",
-	"return_finance",
-	"return_logistics",
-	"return_estate",
-	"new",
-	"cummulative",
-	"phase_1",
-	"phase_2",
-	"phase_3",
-	"phase_4",
-	"deaths",
-	"price",
-	"open",
-	"high",
-	"low",
-	"vol.",
-	"change_%",
+# Define the columns to retain, fill with zeros, and apply rolling mean
+RETAINED_COLUMNS: tuple[str, ...] = (
+    "date",
+    "market_me",
+    "market_mtb",
+    "nout_volume",
+    "oil",
+    "gold",
+    "exchange",
+    "rsi",
+    "pli",
+    "i",
+    "return_wholesale",
+    "return_groce",
+    "return_retail",
+    "return_petro",
+    "return_service",
+    "return_hospitality",
+    "return_pharma",
+    "return_finance",
+    "return_logistics",
+    "return_estate",
+    "new",
+    "cumulative",
+    "phase_1",
+    "phase_2",
+    "phase_3",
+    "phase_4",
+    "deaths",
+    "price",
+    "open",
+    "high",
+    "low",
+    "vol.",
+    "change_%",
 )
 
-# Define columns that should be filled with zeros if missing
-ZERO_FILL_COLUMNS = (
-	"new",
-	"cumulative",
-	"phase_1",
-	"phase_2",
-	"phase_3",
-	"phase_4",
-	"deaths",
+ZERO_FILL_COLUMNS: tuple[str, ...] = (
+    "new",
+    "cumulative",
+    "phase_1",
+    "phase_2",
+    "phase_3",
+    "phase_4",
+    "deaths",
 )
+ROLLING_MEAN_COLUMNS: tuple[str, str] = ("rsi", "pli")
+VOLUME_MULTIPLIERS: dict[str, int] = {
+    "": 1,
+    "K": 1_000,
+    "M": 1_000_000,
+    "B": 1_000_000_000,
+}
 
-# Define columns for which rolling mean imputation should be applied
-ROLLING_MEAN_COLUMNS = ("rsi", "pli")
-MAX_INTERPOLATION_DAYS = 5
+# Define imputation functions for missing values in numeric columns
+def _moving_average_impute(
+    series: pd.Series[object], window: int
+) -> pd.Series[float]:
+    """Fill missing values with local averages and nearest edge averages."""
+    numeric_series = pd.Series(
+        pd.to_numeric(series, errors="coerce").to_numpy(dtype="float64"),
+        index=pd.RangeIndex(len(series)),
+        name=series.name,
+    )
+    trailing_average = numeric_series.rolling(window=window, min_periods=1).mean()
+    leading_average = (
+        numeric_series.iloc[::-1]
+        .rolling(window=window, min_periods=1)
+        .mean()
+        .iloc[::-1]
+    )
+    imputed = numeric_series.fillna(trailing_average).fillna(leading_average)
+    observed = numeric_series.dropna()
+
+    if not observed.empty:
+        valid_positions = np.flatnonzero(numeric_series.notna().to_numpy())
+        first_valid = int(valid_positions[0])
+        last_valid = int(valid_positions[-1])
+
+        if first_valid > 0:
+            leading_mean = observed.iloc[:window].mean()
+            imputed.iloc[:first_valid] = imputed.iloc[:first_valid].fillna(
+                leading_mean
+            )
+
+        if last_valid < len(numeric_series) - 1:
+            trailing_mean = observed.iloc[-window:].mean()
+            imputed.iloc[last_valid + 1 :] = imputed.iloc[last_valid + 1 :].fillna(
+                trailing_mean
+            )
+
+        moving_estimates = trailing_average.fillna(leading_average).interpolate(
+            limit_area="inside",
+            limit_direction="both",
+        )
+        imputed = imputed.fillna(moving_estimates)
+
+    return pd.Series(imputed.to_numpy(), index=series.index, name=series.name)
 
 
-def clean_data(input_file=INPUT_FILE, output_file=OUTPUT_FILE):
-	"""Clean the merged dataset and save it to the mart directory."""
-	data = pd.read_csv(input_file)
+def _parse_numeric_column(
+    series: pd.Series[object], column: str, *, is_percent: bool = False
+) -> pd.Series[float]:
+    """Parse plain numbers, thousands separators, and optional percent signs."""
+    values = series.astype("string").str.strip().str.replace(",", "", regex=False)
+    if is_percent:
+        values = values.str.rstrip("%").str.strip()
 
-	# if "cummulative" not in data.columns and "cumulative" in data.columns:
-	# 	data = data.rename(columns={"cumulative": "cummulative"})
-	
-    # Check for missing required columns
-	missing_columns = [
-		column for column in RETAINED_COLUMNS if column not in data.columns
-	]
-	if missing_columns:
-		raise ValueError(f"Input data is missing required columns: {missing_columns}")
+    numeric = pd.to_numeric(values.replace("", pd.NA), errors="coerce")
+    invalid = (series.notna() & values.ne("") & numeric.isna()).fillna(False)
+    if invalid.any():
+        examples = series.loc[invalid].astype(str).unique().tolist()[:5]
+        raise ValueError(
+            f"Cannot parse values in '{column}'; unexpected values: {examples}"
+        )
 
-    # Retain only the necessary columns
-	data = data.loc[:, RETAINED_COLUMNS].copy()
+    return numeric.replace([float("inf"), float("-inf")], float("nan"))
 
-    # Convert the "date" column to datetime
-	data["date"] = pd.to_datetime(data["date"], errors="coerce")
 
-    # Check for missing or invalid dates
-	if data["date"].isna().any():
-		raise ValueError("Input data contains missing or invalid dates.")
+def _parse_volume(series: pd.Series[object]) -> pd.Series[float]:
+    """Convert volume strings such as '268.79K' or '1.2M' to whole units."""
+    values = series.astype("string").str.strip().str.replace(",", "", regex=False)
+    parts = values.str.extract(
+        r"^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*([KMB]?)$",
+        flags=re.IGNORECASE,
+        expand=True,
+    )
+    invalid = (series.notna() & values.ne("") & parts[0].isna()).fillna(False)
+    if invalid.any():
+        examples = series.loc[invalid].astype(str).unique().tolist()[:5]
+        raise ValueError(f"Cannot parse volume values: {examples}")
 
-	data = data.sort_values("date").set_index("date")
+    number = pd.to_numeric(parts[0], errors="coerce")
+    multiplier = parts[1].str.upper().map(VOLUME_MULTIPLIERS)
+    return number * multiplier
 
-    # Convert value columns to numeric, coercing errors to NaN
-	value_columns = [column for column in RETAINED_COLUMNS if column != "date"]
-	data[value_columns] = data[value_columns].apply(pd.to_numeric, errors="coerce")
 
-    # Fill missing values for specific columns
-	data.loc[:, ZERO_FILL_COLUMNS] = data.loc[:, ZERO_FILL_COLUMNS].fillna(0)
+def clean_data(
+    input_file: str | PathLike[str] = INPUT_FILE,
+    output_file: str | PathLike[str] = OUTPUT_FILE,
+) -> pd.DataFrame:
+    """Clean the merged dataset and save the standardized mart CSV."""
+    data = pd.read_csv(input_file)
+    data.columns = data.columns.str.strip().str.lower()
 
-    # Apply rolling mean imputation for specified columns
-	for column in ROLLING_MEAN_COLUMNS:
-		rolling_mean = data[column].rolling(
-			window="14D", center=True, min_periods=1
-		).mean()
-		data[column] = data[column].fillna(rolling_mean)
+    if data.columns.duplicated().any():
+        duplicates = data.columns[data.columns.duplicated()].tolist()
+        raise ValueError(f"Input contains duplicate column names: {duplicates}")
 
-    # Apply time-based interpolation for the remaining columns
-	interpolation_columns = [
-		column
-		for column in value_columns
-		if column not in ZERO_FILL_COLUMNS and column not in ROLLING_MEAN_COLUMNS
-	]
-	data.loc[:, interpolation_columns] = data.loc[:, interpolation_columns].interpolate(
-		method="time",
-		limit=MAX_INTERPOLATION_DAYS,
-		limit_area="inside",
-	)
+    if "cummulative" in data.columns and "cumulative" not in data.columns:
+        data = data.rename(columns={"cummulative": "cumulative"})
 
-    # Rename columns for consistency and reset the index
-	data = data.rename(columns={"vol.": "volume", "change_%": "return"})
-	# data = data.reset_index()
+    missing_columns = [
+        column for column in RETAINED_COLUMNS if column not in data.columns
+    ]
+    if missing_columns:
+        raise ValueError(f"Input data is missing required columns: {missing_columns}")
 
-    # Save the cleaned data to the specified output file
-	output_file = Path(output_file)
-	output_file.parent.mkdir(parents=True, exist_ok=True)
-	data.to_csv(output_file, index=False)
+    data = data.loc[:, RETAINED_COLUMNS].copy()
+    data["date"] = pd.to_datetime(data["date"], errors="coerce")
+    if data["date"].isna().any():
+        invalid_dates = data.loc[data["date"].isna()].index.tolist()[:5]
+        raise ValueError(f"Input contains missing or invalid dates at rows: {invalid_dates}")
+    if data["date"].duplicated().any():
+        duplicate_dates = data.loc[data["date"].duplicated(), "date"].astype(str)
+        raise ValueError(
+            f"Input contains duplicate dates: {duplicate_dates.unique().tolist()[:5]}"
+        )
 
-    # Check for any remaining missing values and print them
-	remaining_missing = data.isna().sum()
-	remaining_missing = remaining_missing[remaining_missing > 0]
-	if not remaining_missing.empty:
-		print("Remaining missing values (no eligible imputation values):")
-		print(remaining_missing.to_string())
+    data = data.sort_values("date").set_index("date")
+    value_columns = [column for column in RETAINED_COLUMNS if column != "date"]
+    for column in value_columns:
+        if column == "vol.":
+            data[column] = _parse_volume(data[column])
+        else:
+            data[column] = _parse_numeric_column(
+                data[column], column, is_percent=column == "change_%"
+            )
 
-	return data
+    data.loc[:, ZERO_FILL_COLUMNS] = data.loc[:, ZERO_FILL_COLUMNS].fillna(0)
+    for column in value_columns:
+        if column in ZERO_FILL_COLUMNS:
+            continue
+        window = 14 if column in ROLLING_MEAN_COLUMNS else 10
+        data[column] = _moving_average_impute(data[column], window)
+        if data[column].isna().any():
+            raise ValueError(
+                f"Cannot impute '{column}': it has no numeric values to average."
+            )
+
+    data = data.rename(columns={"vol.": "volume", "change_%": "return"})
+    data = data.reset_index()
+
+    output_file = Path(output_file)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    data.to_csv(output_file, index=False)
+
+    print(
+        f"Saved {len(data):,} rows and {len(data.columns):,} columns to {output_file}"
+    )
+    return data
 
 
 if __name__ == "__main__":
-	cleaned_data = clean_data()
-	print(f"Cleaned {len(cleaned_data):,} rows: {OUTPUT_FILE}")
+    clean_data()
