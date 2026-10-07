@@ -27,6 +27,60 @@ SECTOR_RETURN_COLUMNS: tuple[str, ...] = (
     "return_estate",
 )
 
+
+INDICATOR_IMPUTATION_WINDOWS: dict[str, int] = {
+    "momentum_5d": 5,
+    "momentum_20d": 20,
+    "volatility_20d": 20,
+}
+
+
+def impute_indicator_missing_values(df: pd.DataFrame) -> pd.DataFrame:
+    """Fill missing indicator values using adjacent rolling averages."""
+    imputed = df.copy()
+    missing_columns = sorted(
+        set(INDICATOR_IMPUTATION_WINDOWS).difference(imputed.columns)
+    )
+
+    # Check for missing indicator columns
+    if missing_columns:
+        raise ValueError(f"Data is missing indicator columns: {missing_columns}")
+
+    for column, window in INDICATOR_IMPUTATION_WINDOWS.items():
+        values = pd.to_numeric(imputed[column], errors="raise")
+        observed = values.dropna()
+        if observed.empty:
+            raise ValueError(f"Cannot impute '{column}': it has no numeric values.")
+
+        trailing_average = values.rolling(window=window, min_periods=1).mean()
+        leading_average = (
+            values.iloc[::-1]
+            .rolling(window=window, min_periods=1)
+            .mean()
+            .iloc[::-1]
+        )
+        filled_values = values.fillna(trailing_average).fillna(leading_average)
+
+        valid_positions = pd.RangeIndex(len(values))[values.notna().to_numpy()]
+        first_valid = int(valid_positions[0])
+        last_valid = int(valid_positions[-1])
+        if first_valid > 0:
+            filled_values.iloc[:first_valid] = filled_values.iloc[:first_valid].fillna(
+                observed.iloc[:window].mean()
+            )
+        if last_valid < len(values) - 1:
+            filled_values.iloc[last_valid + 1 :] = filled_values.iloc[
+                last_valid + 1 :
+            ].fillna(observed.iloc[-window:].mean())
+
+        imputed[column] = filled_values
+
+        if imputed[column].isna().any():
+            raise ValueError(f"Cannot impute all missing values in '{column}'.")
+
+    return imputed
+
+
 def calculate_market_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """Return the data with liquidity, momentum, volatility, and breadth columns."""
     required_columns = {
@@ -73,7 +127,7 @@ def calculate_market_indicators(df: pd.DataFrame) -> pd.DataFrame:
         sector_returns.notna().sum(axis=1)
     )
 
-    return indicators
+    return impute_indicator_missing_values(indicators)
 
 
 def add_market_indicators(
