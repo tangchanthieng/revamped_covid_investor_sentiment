@@ -1,12 +1,10 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-
 from config import MART_DATA_DIR
 
 INPUT_PATH = MART_DATA_DIR / "subset.csv"
-STANDARDIZED_SET01_PATH = MART_DATA_DIR / "standardized_set01.csv"
-STANDARDIZED_SET02_PATH = MART_DATA_DIR / "standardized_set02.csv"
+STANDARDIZED_DATA_PATH = MART_DATA_DIR / "standardized_data.csv"
 
 EXCLUDED_COLUMNS: tuple[str, ...] = (
     "date",
@@ -49,19 +47,15 @@ def transform_data(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def standardize_subset(
     input_path=INPUT_PATH,
-    set01_path=STANDARDIZED_SET01_PATH,
-    set02_path=STANDARDIZED_SET02_PATH,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Read subset.csv, transform its features, and save both output datasets."""
+    standardized_data_path=STANDARDIZED_DATA_PATH,
+) -> pd.DataFrame:
+    """Read subset.csv and save its StandardScaler-transformed features."""
     data = pd.read_csv(input_path)
-    standardized_set01, standardized_set02 = transform_data(data)
-
-    standardized_set01.to_csv(set01_path, index=False)
-    standardized_set02.to_csv(set02_path, index=False)
-    return standardized_set01, standardized_set02
+    standardized_data, _ = transform_data(data)
+    standardized_data.to_csv(standardized_data_path, index=False)
+    return standardized_data
 
 
 if __name__ == "__main__":
-    set01, set02 = standardize_subset()
-    print(f"Saved {len(set01):,} rows to {STANDARDIZED_SET01_PATH}")
-    print(f"Saved {len(set02):,} rows to {STANDARDIZED_SET02_PATH}")
+    standardized_data = standardize_subset()
+    print(f"Saved {len(standardized_data):,} rows to {STANDARDIZED_DATA_PATH}")
