@@ -14,6 +14,7 @@ RETAINED_COLUMNS: tuple[str, ...] = (
     "date",
     "market_me",
     "market_mtb",
+    "market_volume",
     "nout_volume",
     "oil",
     "gold",
@@ -42,7 +43,6 @@ RETAINED_COLUMNS: tuple[str, ...] = (
     "open",
     "high",
     "low",
-    "vol.",
     "change_%",
 )
 
@@ -56,12 +56,13 @@ ZERO_FILL_COLUMNS: tuple[str, ...] = (
     "deaths",
 )
 ROLLING_MEAN_COLUMNS: tuple[str, str] = ("rsi", "pli")
-VOLUME_MULTIPLIERS: dict[str, int] = {
-    "": 1,
-    "K": 1_000,
-    "M": 1_000_000,
-    "B": 1_000_000_000,
-}
+
+# VOLUME_MULTIPLIERS: dict[str, int] = {
+#     "": 1,
+#     "K": 1_000,
+#     "M": 1_000_000,
+#     "B": 1_000_000_000,
+# }
 
 # Define imputation functions for missing values in numeric columns
 def _moving_average_impute(
@@ -128,23 +129,22 @@ def _parse_numeric_column(
     return numeric.replace([float("inf"), float("-inf")], float("nan"))
 
 
-def _parse_volume(series: pd.Series[object]) -> pd.Series[float]:
-    """Convert volume strings such as '268.79K' or '1.2M' to whole units."""
-    values = series.astype("string").str.strip().str.replace(",", "", regex=False)
-    parts = values.str.extract(
-        r"^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*([KMB]?)$",
-        flags=re.IGNORECASE,
-        expand=True,
-    )
-    invalid = (series.notna() & values.ne("") & parts[0].isna()).fillna(False)
-    if invalid.any():
-        examples = series.loc[invalid].astype(str).unique().tolist()[:5]
-        raise ValueError(f"Cannot parse volume values: {examples}")
+# def _parse_volume(series: pd.Series[object]) -> pd.Series[float]:
+#     """Convert volume strings such as '268.79K' or '1.2M' to whole units."""
+#     values = series.astype("string").str.strip().str.replace(",", "", regex=False)
+#     parts = values.str.extract(
+#         r"^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*([KMB]?)$",
+#         flags=re.IGNORECASE,
+#         expand=True,
+#     )
+#     invalid = (series.notna() & values.ne("") & parts[0].isna()).fillna(False)
+#     if invalid.any():
+#         examples = series.loc[invalid].astype(str).unique().tolist()[:5]
+#         raise ValueError(f"Cannot parse volume values: {examples}")
 
-    number = pd.to_numeric(parts[0], errors="coerce")
-    multiplier = parts[1].str.upper().map(VOLUME_MULTIPLIERS)
-    return number * multiplier
-
+#     number = pd.to_numeric(parts[0], errors="coerce")
+#     multiplier = parts[1].str.upper().map(VOLUME_MULTIPLIERS)
+#     return number * multiplier
 
 def clean_data(
     input_file: str | PathLike[str] = INPUT_FILE,
@@ -180,13 +180,18 @@ def clean_data(
 
     data = data.sort_values("date").set_index("date")
     value_columns = [column for column in RETAINED_COLUMNS if column != "date"]
+    # for column in value_columns:
+    #     if column == "market_volume":
+    #         data[column] = _parse_volume(data[column])
+    #     else:
+    #         data[column] = _parse_numeric_column(
+    #             data[column], column, is_percent=column == "change_%"
+    #         )
     for column in value_columns:
-        if column == "vol.":
-            data[column] = _parse_volume(data[column])
-        else:
-            data[column] = _parse_numeric_column(
-                data[column], column, is_percent=column == "change_%"
-            )
+        data[column] = _parse_numeric_column(
+        data[column], column, is_percent=column == "change_%"
+        )
+            
 
     data.loc[:, ZERO_FILL_COLUMNS] = data.loc[:, ZERO_FILL_COLUMNS].fillna(0)
     for column in value_columns:
@@ -199,7 +204,7 @@ def clean_data(
                 f"Cannot impute '{column}': it has no numeric values to average."
             )
 
-    data = data.rename(columns={"vol.": "volume", "change_%": "return"})
+    data = data.rename(columns={"change_%": "return"})
     data = data.reset_index()
 
     output_file = Path(output_file)
