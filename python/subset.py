@@ -12,8 +12,6 @@ def subset_data(df: pd.DataFrame, n_rows: int = 1097) -> pd.DataFrame:
     df_subset.to_csv(subset_path, index=False)
     return df_subset
 
-# Build new columns for PCA test run
-
 if __name__ == "__main__":
     data = pd.read_csv(data_path)
     subset_data(data)
