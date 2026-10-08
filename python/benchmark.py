@@ -3,6 +3,7 @@ import pandas as pd
 import statsmodels.api as sm
 from statsmodels.stats.diagnostic import (
     acorr_breusch_godfrey,
+    het_arch,
     het_breuschpagan,
 )
 from statsmodels.stats.stattools import durbin_watson
@@ -30,6 +31,7 @@ LEVEL_PREDICTORS = (
     "market_breadth",
 )
 AUTOCORRELATION_LAGS = 5
+ARCH_LAGS = 5
 
 
 def run_benchmark(
@@ -122,6 +124,10 @@ def run_benchmark(
         nlags=AUTOCORRELATION_LAGS,
         result_object=False,
     )
+    arch_lm, arch_lm_pvalue, arch_f, arch_f_pvalue = het_arch(
+        results.resid,
+        nlags=ARCH_LAGS,
+    )
 
     print("\nBreusch-Pagan heteroskedasticity test")
     print("Null hypothesis: homoskedastic errors")
@@ -133,6 +139,11 @@ def run_benchmark(
     print(f"LM statistic: {bg_lm:.4f}; p-value: {bg_lm_pvalue:.6g}")
     print(f"F statistic:  {bg_f:.4f}; p-value: {bg_f_pvalue:.6g}")
     print(f"Durbin-Watson statistic: {durbin_watson(results.resid):.4f}")
+
+    print(f"\nEngle ARCH LM test ({ARCH_LAGS} lags)")
+    print("Null hypothesis: no ARCH effects")
+    print(f"LM statistic: {arch_lm:.4f}; p-value: {arch_lm_pvalue:.6g}")
+    print(f"F statistic:  {arch_f:.4f}; p-value: {arch_f_pvalue:.6g}")
 
     return results
 
