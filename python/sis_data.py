@@ -44,3 +44,5 @@ merge_df.to_csv(output_path, index=False)
 print("\nMerge completed successfully.")
 print(f"Matched rows:     {len(merge_df):,}")
 print(f"Output columns:   {len(merge_df.columns):,}")
+print(f"Rows with missing values: {merge_df.isnull().sum().sum():,}")
+
