@@ -152,6 +152,13 @@ def run_garch(
     ).pow(2)
     output_data["market_variance"] = float("nan")
     output_data.loc[market_variance.index, "market_variance"] = market_variance
+    missing_variance_count = int(output_data["market_variance"].isna().sum())
+    variance_mean = output_data["market_variance"].mean()
+    if pd.isna(variance_mean):
+        raise ValueError("Cannot impute market_variance: no estimates are available.")
+    output_data["market_variance"] = output_data["market_variance"].fillna(
+        variance_mean
+    )
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_data.to_csv(output_path, index=False)
@@ -179,7 +186,8 @@ def run_garch(
     print(f"LM statistic: {tarch_lm:.4f}; p-value: {tarch_lm_pvalue:.6g}")
     print(f"F statistic:  {tarch_f:.4f}; p-value: {tarch_f_pvalue:.6g}")
     print(f"\nSaved TARCH conditional variance to: {output_path.resolve()}")
-    print(f"Rows with estimated market variance: {market_variance.notna().sum():,}")
+    print(f"Rows imputed with mean market variance: {missing_variance_count:,}")
+    print(f"Mean market variance used for imputation: {variance_mean:.8g}")
 
     return results
 
