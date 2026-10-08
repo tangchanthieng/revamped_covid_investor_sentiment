@@ -9,6 +9,7 @@ from statsmodels.stats.diagnostic import het_arch
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 INPUT_FILE = PROJECT_DIR / "data" / "mart" / "data.csv"
+OUTPUT_FILE = PROJECT_DIR / "data" / "mart" / "conditional_volatility.csv"
 LEVEL_EXOGENOUS = ("oil", "gold", "exchange", "i")
 COVID_PREDICTORS = ("new", "phase_1", "phase_2", "phase_3", "phase_4", "deaths")
 ARCH_LAGS = 5
@@ -16,10 +17,14 @@ ARCH_LAGS = 5
 
 def run_garch(
     input_file: str | Path = INPUT_FILE,
+    output_file: str | Path = OUTPUT_FILE,
 ) -> ARCHModelResult:
-    """Fit a GARCH(1, 1) model with exogenous predictors and test its residuals."""
-    data = pd.read_csv(input_file)
+    """Fit GARCH models and save TARCH conditional variance with the input data."""
+    source_data = pd.read_csv(input_file)
+    output_data = source_data.copy()
+    data = source_data.copy()
     data.columns = data.columns.str.strip()
+    output_data.columns = output_data.columns.str.strip()
 
     return_predictors = [
         column for column in data.columns if column.startswith("return_")
@@ -141,6 +146,16 @@ def run_garch(
             f"(convergence flag: {tarch_results.convergence_flag})."
         )
 
+    market_variance = pd.Series(
+        tarch_results.conditional_volatility,
+        index=model_data.index,
+    ).pow(2)
+    output_data["market_variance"] = float("nan")
+    output_data.loc[market_variance.index, "market_variance"] = market_variance
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_data.to_csv(output_path, index=False)
+
     arch_lm, arch_lm_pvalue, arch_f, arch_f_pvalue = het_arch(
         results.std_resid.dropna(),
         nlags=ARCH_LAGS,
@@ -163,6 +178,8 @@ def run_garch(
     print("TARCH null hypothesis: no remaining ARCH effects")
     print(f"LM statistic: {tarch_lm:.4f}; p-value: {tarch_lm_pvalue:.6g}")
     print(f"F statistic:  {tarch_f:.4f}; p-value: {tarch_f_pvalue:.6g}")
+    print(f"\nSaved TARCH conditional variance to: {output_path.resolve()}")
+    print(f"Rows with estimated market variance: {market_variance.notna().sum():,}")
 
     return results
 
