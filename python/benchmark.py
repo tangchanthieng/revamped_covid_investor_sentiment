@@ -7,10 +7,10 @@ from statsmodels.stats.diagnostic import (
     het_breuschpagan,
 )
 from statsmodels.stats.stattools import durbin_watson
+from config import MART_DATA_DIR
 
 # Define data paths and constants
-PROJECT_DIR = Path(__file__).resolve().parent.parent
-INPUT_FILE = PROJECT_DIR / "data" / "mart" / "data.csv"
+INPUT_FILE = MART_DATA_DIR / "data.csv"
 
 DIFFERENCE_COLUMNS = (
     "market_me",
