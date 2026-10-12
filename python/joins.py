@@ -1,6 +1,5 @@
 import pandas as pd
-from pathlib import Path
-from config import RAW_DATA_DIR, STAGING_DATA_DIR, MART_DATA_DIR
+from config import RAW_DATA_DIR, STAGING_DATA_DIR
 
 # Raw data file paths
 market_data = RAW_DATA_DIR/"market_data.csv"
@@ -13,9 +12,9 @@ first_merge = STAGING_DATA_DIR/"first_merge.csv"
 second_merge = STAGING_DATA_DIR/"second_merge.csv"
 third_merge = STAGING_DATA_DIR/"third_merge.csv"
 
-# ==========================
+# ===============================================
 # FIRST MERGE: Merge covid cases with death cases
-# ==========================
+# ===============================================
 
 # Load raw CSV files
 df_covid_cases = pd.read_csv(covid_cases)
@@ -72,9 +71,9 @@ print(f"Matched rows:     {len(first_merged):,}")
 print(f"Output columns:   {len(first_merged.columns):,}")
 print(f"Output file:      {first_merge}")
 
-# ==========================
+# ================================================================
 # SECOND MERGE: Merge market data with covid cases and death cases
-# ==========================
+# ================================================================
 
 # Load CSV files
 df_cases_deaths = pd.read_csv(first_merge)
@@ -108,9 +107,9 @@ print(f"Matched rows:     {len(second_merged):,}")
 print(f"Output columns:   {len(second_merged.columns):,}")
 print(f"Output file:      {second_merge}")
 
-# ==========================
+# =================================================================================
 # THIRD MERGE: Merge historical data with covid cases, death cases, and market data
-# ==========================
+# =================================================================================
 
 # Load CSV files
 df_cases_deaths_market = pd.read_csv(second_merge)
