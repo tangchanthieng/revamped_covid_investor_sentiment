@@ -1,7 +1,9 @@
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parents[1]
+# Define project directories
+BASE_DIR = Path(__file__).resolve().parents[1] 
 
+# Define project directories
 PROJECT_DIRS = {
     'base_dir': BASE_DIR,
     'data_dir': BASE_DIR / 'data',
@@ -9,10 +11,10 @@ PROJECT_DIRS = {
     'staging_data_dir': BASE_DIR / 'data' / 'staging',
     'mart_data_dir': BASE_DIR / 'data' / 'mart',
     'assets_dir': BASE_DIR / 'assets',
-    'notebooks_dir': BASE_DIR / 'notebook',
+    'notebooks_dir': BASE_DIR / 'notebooks',
 }
 
-
+# Function to return validated project directories
 def config_paths() -> dict[str, Path]:
     """Return validated project directories."""
     missing = [
