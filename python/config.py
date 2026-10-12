@@ -1,14 +1,35 @@
 from pathlib import Path
-import os
 
-# Define the base directory of the project
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parents[1]
 
-# Define the path to the configuration file
-DATA_DIR = BASE_DIR / 'data'
-RAW_DATA_DIR = DATA_DIR / 'raw'
-STAGING_DATA_DIR = DATA_DIR / 'staging'
-MART_DATA_DIR = DATA_DIR / 'mart'
+PROJECT_DIRS = {
+    'base_dir': BASE_DIR,
+    'data_dir': BASE_DIR / 'data',
+    'raw_data_dir': BASE_DIR / 'data' / 'raw',
+    'staging_data_dir': BASE_DIR / 'data' / 'staging',
+    'mart_data_dir': BASE_DIR / 'data' / 'mart',
+    'assets_dir': BASE_DIR / 'assets',
+    'notebooks_dir': BASE_DIR / 'notebook',
+}
 
-ASSETS_DIR = BASE_DIR / 'assets'
-NOTEBOOKS_DIR = BASE_DIR / 'notebook'
+
+def config_paths() -> dict[str, Path]:
+    """Return validated project directories."""
+    missing = [
+        f"{name}: {path}"
+        for name, path in PROJECT_DIRS.items()
+        if not path.exists()
+    ]
+
+    if missing:
+        raise FileNotFoundError(
+            'Missing required project directories:\n- ' + '\n- '.join(missing)
+        )
+
+    return PROJECT_DIRS.copy()
+
+
+if __name__ == '__main__':
+    for key, path in config_paths().items():
+        print(f'{key}: {path}')
+
