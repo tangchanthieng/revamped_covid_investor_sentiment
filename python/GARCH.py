@@ -1,15 +1,15 @@
 from pathlib import Path
 import warnings
-
+from config import CLEANED_DATA_DIR
 import pandas as pd
 from arch import arch_model
 from arch.univariate.base import ARCHModelResult
 from statsmodels.stats.diagnostic import het_arch
 
 
-PROJECT_DIR = Path(__file__).resolve().parent.parent
-INPUT_FILE = PROJECT_DIR / "data" / "mart" / "data.csv"
-OUTPUT_FILE = PROJECT_DIR / "data" / "mart" / "conditional_volatility.csv"
+# PROJECT_DIR = Path(__file__).resolve().parent.parent
+INPUT_FILE = CLEANED_DATA_DIR / "data.csv"
+OUTPUT_FILE = CLEANED_DATA_DIR / "market_variance.csv"
 LEVEL_EXOGENOUS = ("oil", "gold", "exchange", "i")
 COVID_PREDICTORS = ("new", "phase_1", "phase_2", "phase_3", "phase_4", "deaths")
 ARCH_LAGS = 5
