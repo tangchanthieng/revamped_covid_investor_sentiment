@@ -1,5 +1,5 @@
 from pathlib import Path
-
+from config import CLEANED_DATA_DIR, ASSETS_DIR
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -10,10 +10,8 @@ from statsmodels.stats.diagnostic import (
 )
 from statsmodels.tsa.ardl import ARDL
 
-
-PROJECT_DIR = Path(__file__).resolve().parent.parent
-INPUT_FILE = PROJECT_DIR / "data" / "mart" / "conditional_volatility.csv"
-FIGURE_FILE = PROJECT_DIR / "assets" / "CUSUM_CUSMSQ.png"
+INPUT_FILE = CLEANED_DATA_DIR / "market_variance.csv"
+FIGURE_FILE = ASSETS_DIR / "CUSUM_CUSMSQ.png"
 
 DEPENDENT_VARIABLE = "market_variance"
 EXOGENOUS_VARIABLES = (
