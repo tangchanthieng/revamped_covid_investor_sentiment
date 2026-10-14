@@ -117,20 +117,26 @@ Track whether pandemic-related developments actually affect economic activity, c
 
 ``Setup and execution``
 
+- Project workflow:
+
+  ![Project workflow](assets/project_workflow.png)
+
 - Open a terminal in the project root and create a virtual environment if needed:
   - `python -m venv .venv`
   - `./.venv/Scripts/Activate.ps1`  (Windows PowerShell)
 - Install the project dependencies:
   - `python -m pip install --upgrade pip`
   - `python -m pip install -r requirements.txt`
-- Run the data preparation and analytics pipeline in sequence:
+- Run the data preparation and analytics pipeline in sequence. `model_benchmark.py`
+  creates `data.csv`, which is required by the GARCH/TARCH step, and also runs
+  the optional OLS benchmark diagnostics:
   - `python python/joins.py`
   - `python python/clean.py`
   - `python python/standardization.py`
   - `python python/pca.py`
+  - `python python/model_benchmark.py`
   - `python python/GARCH.py`
   - `python python/ARDL.py`
-  - `python python/model_benchmark.py`  (optional benchmark OLS + diagnostics run)
 - The output files are generated under the `data/cleaned/`, `data/merged/`, and `assets/` directories, including:
   - `data/merged/first_merge.csv`
   - `data/merged/second_merge.csv`
@@ -140,6 +146,7 @@ Track whether pandemic-related developments actually affect economic activity, c
   - `data/cleaned/IS.csv`
   - `data/cleaned/SIS.csv`
   - `data/cleaned/data.csv`  (benchmark dataset used by `model_benchmark.py`)
+  - `assets/project_workflow.png`
   - `assets/IS_correlation_map.png`
   - `assets/SIS_correlation_map.png`
   - `assets/CUSUM_CUSMSQ.png`
