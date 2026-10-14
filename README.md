@@ -89,7 +89,7 @@ This project is built entirely on Python with the following libraries:
 
 ``Recommendation``
 
-Use your PCA-based investor sentiment index to identify unusually optimistic or pessimistic market conditions. Combine it with market returns, trading volume, liquidity and other indicators.
+Use the PCA-based investor sentiment index to identify unusually optimistic or pessimistic market conditions. Combine it with market returns, trading volume, liquidity and other indicators.
 - When sentiment deteriorates sharply, reassess portfolio risk and exposure.
 - When sentiment becomes extremely optimistic, examine whether prices are running ahead of fundamentals.
 - Avoid buying or selling solely because the sentiment index changes direction.
