@@ -1,6 +1,6 @@
 ### Investor Sentiment and Vietnam Stock Market
 
-Update on Oct 2026
+Updated on Oct 2026
 
 ### Project Summary
 
